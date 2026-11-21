@@ -25,54 +25,23 @@ Tasks プラグインのクエリ結果（Todos や Daily Note の ```tasks ブ�
 2. コマンドパレットから「Complete with Note: 追記して完了」を実行（ホットキーの割り当てがおすすめ）
 3. モーダルで記録を入力して Enter（空欄のまま完了もできる）
 
-### 3. DataviewJS のボタン
+## API（DataviewJS などから使う）
 
-Dataview の設定で DataviewJS が有効なら、表示用ノートに次のブロックを置くと、各タスクに「記録して完了」ボタンが付く。
+他のプラグインや DataviewJS から、記録モーダルを開いてタスクを完了できる。
 
-```dataviewjs
-// 「記録して完了」ボタン付きタスク一覧（日付フィルター付き）
-// 置いたノートの日付（Daily Note のファイル名の日付、なければ今日）で絞る
+```ts
 const plugin = app.plugins.plugins['complete-with-note'];
-if (!plugin) {
-  dv.paragraph('⚠️ プラグイン「Complete with Note」が有効になっていません');
-} else {
-  // ===== 設定 =====
-  const SOURCE = '"03 メモ"';        // 対象フォルダ
-  const INCLUDE_OVERDUE = true;      // 📅⏳ が過ぎた未完了も出す
-  const START_MODE = 'onOrBefore';   // 🛫 目安の日付: 'onOrBefore'（その日以降ずっと候補）/ 'exact'（当日のみ）/ 'off'（出さない）
-  const INCLUDE_UNDATED = false;     // 日付のないタスクも出す
-  // ================
-  const day = dv.current().file.day ?? dv.date('today');
-  const dayMs = day.toMillis();
-  const le = (d) => !!d && (INCLUDE_OVERDUE ? d.toMillis() <= dayMs : d.toMillis() === dayMs);
-  const startHit = (d) => {
-    if (!d || START_MODE === 'off') return false;
-    return START_MODE === 'exact' ? d.toMillis() === dayMs : d.toMillis() <= dayMs;
-  };
-  const tasks = dv.pages(SOURCE)
-    .file.tasks
-    .where(t => !t.completed)
-    .where(t => le(t.due) || le(t.scheduled) || startHit(t.start)
-      || (INCLUDE_UNDATED && !t.due && !t.scheduled && !t.start))
-    .sort(t => (t.due ? t.due.toMillis() : Number.MAX_SAFE_INTEGER));
-  if (tasks.length === 0) dv.paragraph('（この日のタスクはありません）');
-  for (const t of tasks) {
-    const row = dv.el('div', '');
-    row.createEl('span', { text: '・' + t.text });
-    const btn = row.createEl('button', { text: '記録して完了' });
-    btn.style.marginLeft = '0.6em';
-    btn.onclick = () => plugin.completeWithNote(t.path, t.line, t.text);
-  }
-}
+plugin.completeWithNote(path, lineNumber, expectedText?);
 ```
 
-日付フィルターの既定の挙動：
+| 引数 | 型 | 説明 |
+|---|---|---|
+| `path` | `string` | タスクのあるファイルの Vault 相対パス |
+| `lineNumber` | `number` | タスク行の行番号（0 始まり） |
+| `expectedText` | `string`（省略可） | 行の照合用。渡すと、先頭 20 文字（前後の空白を除いたもの）が対象行に含まれているかを確認し、含まれていなければ中止する |
 
-- 📅 締切と ⏳ 実施日は、その日以前の未完了を出す（期限切れも拾う。`INCLUDE_OVERDUE = false` で当日のみ）
-- 🛫 目安は「その日が来たら候補」なので、その日以降ずっと出す（`START_MODE` で当日だけ／出さないに変更可）
-- 日付のないタスクは出さない（`INCLUDE_UNDATED = true` で出す）
-
-ボタンを押すとモーダルが開き、入力した記録を**元のファイルの該当行**に書き込んで完了にする。行番号と内容が照合できない場合（表示後にファイルが変わった等）は、安全のため中止して通知する。
+- 戻り値は `Promise<void>`。モーダルが開き、送信すると記録を書き込んで、元のファイルでタスクを完了にする
+- ファイルが見つからない／対象行が未完了タスク（`- [ ]`）でない／`expectedText` が一致しない場合は、通知を表示して何もしない
 
 ## 入力テンプレート
 
@@ -125,18 +94,11 @@ if (!plugin) {
 2. Vault の `.obsidian/plugins/complete-with-note/` フォルダに入れる（フォルダがなければ作る）
 3. Obsidian の 設定 → コミュニティプラグイン で「Complete with Note」を有効にする
 
-## 仕組みメモ
-
-- 処理順序：素のタスク行を Tasks API でトグル → 戻ってきた完了行（`- [x]` の行）にだけ記録を適用。繰り返しの次回分は無記録のまま残る
-- Tasks に「完了を横取りする」公式フックはないので、一覧のフックは描画されたチェックボックスへのクリックを capture フェーズで受け取り、Tasks 自身の処理の前に振り替えている。元のタスクの特定は、バックリンクの表示テキストから元ファイルを解決し、ファイル内では説明文と描画されているフィールド文字列（日付・繰り返しなど）で照合する。特定できない場合は横取りしない
-- 記録の挿入位置（タスク内テンプレートがない場合）：既定は行末（✅ の後ろ）。テンプレートで `title` を指定した場合はタスク名の直後で、判定は Tasks フィールドの絵文字（📅 ⏳ 🛫 ✅ ❌ ➕ 🔁 優先度 🆔 ⛔ 🏁 ⏰）と Dataview 形式フィールド `[key:: …]` のうち最も早いものの手前。Wiki リンク `[[…]]` はフィールドと誤認しない
-- 日本語入力（IME）の変換確定 Enter では送信されない。変換後の素の Enter で送信される
-
 ## 開発
 
 - ソース：`src/main.ts`（プラグイン本体）、`src/lineEdit.ts`（行編集の純粋ロジック）、`src/template.ts`（テンプレート処理）
 - `npm run build` で `dist/complete-with-note/main.js` を生成
-- `npm test` で単体テスト（48 ケース）
+- `npm test` で単体テスト（48 ケース）。テストは `test/lineEdit.test.mjs` と `test/template.test.mjs`
 
 ## ライセンス
 
