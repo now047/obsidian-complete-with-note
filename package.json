@@ -1,0 +1,15 @@
+{
+  "description": "Obsidian plugin: complete a task with an appended note",
+  "devDependencies": {
+    "esbuild": "^0.24.0",
+    "obsidian": "^1.7.2",
+    "typescript": "^5.6.0"
+  },
+  "main": "main.js",
+  "name": "obsidian-complete-with-note",
+  "scripts": {
+    "build": "node esbuild.config.mjs",
+    "test": "node esbuild.config.mjs test && node test/lineEdit.test.mjs && node test/template.test.mjs"
+  },
+  "version": "0.6.8"
+}

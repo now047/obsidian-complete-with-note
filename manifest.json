@@ -1,0 +1,9 @@
+{
+  "author": "now047",
+  "description": "Complete a task after appending a short note (distance/time for a run, minutes for reading, a one-line reflection) to its line. Toggling is delegated to the Tasks plugin API, so done dates and recurrence stay correct.",
+  "id": "complete-with-note",
+  "isDesktopOnly": false,
+  "minAppVersion": "1.5.0",
+  "name": "Complete with Note",
+  "version": "0.6.8"
+}
