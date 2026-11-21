@@ -1,105 +1,111 @@
-# Complete with Note（追記して完了）
+# Complete with Note
 
-Obsidian 用の小さなプラグイン。タスクを完了にするとき、**短い記録を入力してタスク行に書き込んでから完了**にできる。
+[日本語版 README](README.ja.md)
 
-- ラン：`- [x] Jog 4.23 km / 31 min 🔁 every day when done 🛫 2026-11-18 ✅ 2026-11-21`
-- 読書：`- [x] 読書 30分 『賢者の書』 🔁 every day when done ✅ 2026-11-21`
-- 小さな成長：`- [x] 小さな成長 noteに投稿できた 🔁 every day when done ✅ 2026-11-21`
+A small Obsidian plugin. When you complete a task, you can **type a short note and have it written into the task line as it is completed**.
 
-記録は**完了した行にだけ**入り、繰り返しタスクの次回分には混入しない。完了処理（✅ の付与と次回分の生成）は **Tasks プラグインの公式 API（apiV1）に委譲**しているので、繰り返しルールも Tasks の設定どおりに処理される。
+- Run: `- [x] Jog 4.23 km / 31 min 🔁 every day when done 🛫 2026-11-18 ✅ 2026-11-21`
+- Reading: `- [x] Reading 30 min "The Wise Book" 🔁 every day when done ✅ 2026-11-21`
+- Small win: `- [x] Small win: posted to my journal 🔁 every day when done ✅ 2026-11-21`
 
-## 使い方
+The note goes **only into the completed line** and never leaks into the next occurrence of a recurring task. Completion itself (adding ✅ and generating the next occurrence) is **delegated to the Tasks plugin's official API (apiV1)**, so recurrence rules are handled exactly according to your Tasks settings.
 
-### 1. Tasks の一覧でそのまま（主な使い方）
+## Usage
 
-Tasks プラグインのクエリ結果（Todos や Daily Note の ```tasks ブロック）や閲覧ビューのチェックボックスをクリックすると、記録モーダルが開く。表示は Tasks の形式そのままで、横取りするのは完了アクションだけ。
+### 1. Directly in Tasks lists (the main way)
 
-- 横取りするのは **TODO → 完了方向だけ**。チェックを外す操作や進行中ステータスは Tasks の通常処理に渡す
-- 既定では、記録フォーマットのあるタスク（後述のテンプレートがあるタスク）だけモーダルを開き、それ以外は記録なしで通常完了する。設定で「すべてのタスク」に変更可、フック自体の無効化も可
-- 元のタスクを特定できない場合は横取りせず、通常のクリックとして処理される（壊れた完了にはならない）
-- 対象はクエリ結果と閲覧ビュー。**ライブプレビューの本文中のチェックボックスは対象外**
+Clicking a checkbox in a Tasks plugin query result (```tasks blocks in a Todos note or Daily Notes) or in Reading View opens the note modal. The display is exactly the Tasks format; only the completion action is intercepted.
 
-### 2. エディタのコマンド
+- Only the **TODO → done direction** is intercepted. Un-checking and in-progress statuses pass through to the Tasks plugin.
+- By default, the modal opens only for tasks that have a note format (a template, described below); other tasks complete normally without a note. This can be changed to "All tasks" in the settings, and the hook can be disabled entirely.
+- If the source task cannot be identified, the click is processed as a normal click (it never produces a broken completion).
+- Applies to query results and Reading View. **Checkboxes in the note body in Live Preview are not covered.**
 
-1. 元ノートで、未完了タスクの行にカーソルを置く
-2. コマンドパレットから「Complete with Note: 追記して完了」を実行（ホットキーの割り当てがおすすめ）
-3. モーダルで記録を入力して Enter（空欄のまま完了もできる）
+### 2. Editor command
 
-## API（DataviewJS などから使う）
+1. In the source note, place the cursor on an incomplete task line
+2. Run "Complete with Note: Complete with note" from the command palette (assigning a hotkey is recommended)
+3. Type the note in the modal and press Enter (completing with the fields left empty is fine)
 
-他のプラグインや DataviewJS から、記録モーダルを開いてタスクを完了できる。
+## API (for DataviewJS and other plugins)
+
+Other plugins and DataviewJS can open the note modal and complete a task through the public API.
 
 ```ts
 const plugin = app.plugins.plugins['complete-with-note'];
 plugin.completeWithNote(path, lineNumber, expectedText?);
 ```
 
-| 引数 | 型 | 説明 |
+| Argument | Type | Description |
 |---|---|---|
-| `path` | `string` | タスクのあるファイルの Vault 相対パス |
-| `lineNumber` | `number` | タスク行の行番号（0 始まり） |
-| `expectedText` | `string`（省略可） | 行の照合用。渡すと、先頭 20 文字（前後の空白を除いたもの）が対象行に含まれているかを確認し、含まれていなければ中止する |
+| `path` | `string` | Vault-relative path of the file containing the task |
+| `lineNumber` | `number` | Line number of the task line (0-based) |
+| `expectedText` | `string` (optional) | Line verification. When given, the first 20 characters (trimmed) must be contained in the target line; otherwise the call aborts |
 
-- 戻り値は `Promise<void>`。モーダルが開き、送信すると記録を書き込んで、元のファイルでタスクを完了にする
-- ファイルが見つからない／対象行が未完了タスク（`- [ ]`）でない／`expectedText` が一致しない場合は、通知を表示して何もしない
+- Returns `Promise<void>`. The modal opens; on submit, the note is written and the task is completed in the source file.
+- If the file is not found, the target line is not an incomplete task (`- [ ]`), or `expectedText` does not match, a notice is shown and nothing happens.
 
-## 入力テンプレート
+## Input templates
 
-モーダルの入力欄はテンプレートで定義できる。`{名前}` が入力欄になり、リテラル文字（単位など）はそのまま書く。
+The modal's input fields are defined by templates. Each `{name}` becomes one input field; literal text (units etc.) is written as-is.
 
-### タスク行に書く（推奨）
+### In the task line (recommended)
 
 ```
 - [ ] Jog {km} km / {minutes} min 🔁 every day when done 🛫 2026-11-18
 ```
 
-- **置き場所はタスク名の直後、フィールド（🔁 📅 🛫 など）より前**。日付フィールドより後ろに書くと Dataview／Tasks のクエリでタスクを拾えなくなることがあるため、その位置の `{…}` はテンプレートとして扱わない
-- 完了した行では、テンプレートが入力値にその場で置き換わる（日付より後ろには何も書かない）
-- 繰り返しタスクでは次回分にテンプレートがそのまま残る（定義だから）
-- 空欄で完了した場合も、完了行からテンプレートは取り除かれる
-- 設定よりタスク行のテンプレートが優先される。タスクごとに形式を変えられるので、設定でキーワードを管理しなくてよい
+- **Place it right after the task name, before the fields (🔁 📅 🛫 …)**. A `{…}` written after a date field is not treated as a template, because text after date fields can make the task invisible to Dataview/Tasks queries.
+- In the completed line, the template is replaced in place by the entered values (nothing is written after the date fields).
+- For recurring tasks, the template stays on the next occurrence (it is the definition).
+- The template is also removed from the completed line when you complete with empty fields.
+- An inline template takes precedence over settings templates, so each task can have its own format without managing keywords in the settings.
 
-### 設定に書く
+### In the settings
 
-プラグイン設定で編集する。1行に1つ、「名前 | キーワード | テンプレート | 位置」の形式（位置は省略可）：
+Edited in the plugin settings, one per line, in the form "Name | Keywords | Template | Position" (position optional):
 
 ```
-ラン | Jog, Long Jog, ランニング | {km} km / {minutes} min
-読書 | 読書 | {minutes}分 {title}
-自由 |  | {note}
+Run | Jog, Long Jog, Running | {km} km / {minutes} min
+Reading | Reading | {minutes} min {title}
+Free |  | {note}
 ```
 
-- タスク名にキーワードが含まれるテンプレートが自動で選ばれる（モーダル上のチップで切替もできる）
-- キーワードなしの行が既定（フォールバック）。どれもなければ自由文1欄（`{note}`）
-- 同じ `{名前}` が複数回出てきたら、入力欄は1つで全箇所に反映される
-- 位置は `end`（既定：✅ の後ろ＝行末）か `title`（タスク名の直後）。`title` にすると Tasks フィールド（📅 ⏳ 🛫 🔁 など）の手前に入る
-- モーダル下部のプレビューには、記録を反映した後のタスク名が表示される
+- The template whose keyword appears in the task name is selected automatically (you can also switch with the chips in the modal).
+- A line without keywords is the default (fallback). If there is none, a single free-text field (`{note}`) is used.
+- If the same `{name}` appears more than once, there is one input field and the value is reflected in every occurrence.
+- Position is `end` (default: after the ✅ date, i.e. the end of the line) or `title` (right after the task name). With `title`, the note goes before the Tasks fields (📅 ⏳ 🛫 🔁 …).
+- The preview at the bottom of the modal shows the task name as it will look with the note applied.
 
-## 設定
+## Settings
 
-- **テンプレート定義**：上記の「名前 | キーワード | テンプレート | 位置」形式
-- **Tasks の一覧でチェックを横取り**：オン／オフ
-- **フックする対象**：「テンプレートのあるタスクのみ」（既定）／「すべてのタスク」
-- **デバッグ通知**：フックの判定過程を通知で表示（トラブル調査用。通常はオフ）
+- **Templates**: the "Name | Keywords | Template | Position" form described above
+- **Hook checkboxes in Tasks lists**: on/off
+- **Hook scope**: "Only tasks with a template" (default) / "All tasks"
+- **Debug notices**: show the hook decision process as notices (for troubleshooting; normally off)
 
-## 必要なもの
+## Languages
 
-- Obsidian 1.5 以上
-- Tasks プラグイン **7.2.0 以上**（API のある版）
-  - 見つからない場合は簡易完了（`[x]`＋✅ のみ、繰り返し未処理）にフォールバックし、その旨を通知する
+The UI follows Obsidian's display language: Japanese when the app is in Japanese, English otherwise. There is no language setting in the plugin.
 
-## インストール
+## Requirements
 
-1. [Releases](https://github.com/now047/obsidian-complete-with-note/releases) から `main.js` と `manifest.json` をダウンロードする
-2. Vault の `.obsidian/plugins/complete-with-note/` フォルダに入れる（フォルダがなければ作る）
-3. Obsidian の 設定 → コミュニティプラグイン で「Complete with Note」を有効にする
+- Obsidian 1.5 or later
+- Tasks plugin **7.2.0 or later** (the version with the API)
+  - If it is not found, the plugin falls back to a simple completion (`[x]` + ✅ only, no recurrence handling) and notifies you
 
-## 開発
+## Installation
 
-- ソース：`src/main.ts`（プラグイン本体）、`src/lineEdit.ts`（行編集の純粋ロジック）、`src/template.ts`（テンプレート処理）
-- `npm run build` で `dist/complete-with-note/main.js` を生成
-- `npm test` で単体テスト（48 ケース）。テストは `test/lineEdit.test.mjs` と `test/template.test.mjs`
+1. Download `main.js` and `manifest.json` from [Releases](https://github.com/now047/obsidian-complete-with-note/releases)
+2. Put them into your vault's `.obsidian/plugins/complete-with-note/` folder (create the folder if needed)
+3. Enable "Complete with Note" under Settings → Community plugins
 
-## ライセンス
+## Development
+
+- Source: `src/main.ts` (the plugin), `src/lineEdit.ts` (pure line-editing logic), `src/template.ts` (template handling), `src/i18n.ts` (display-language detection and string table)
+- `npm run build` produces `dist/complete-with-note/main.js`
+- `npm test` runs the unit tests (48 cases): `test/lineEdit.test.mjs` and `test/template.test.mjs`
+
+## License
 
 MIT

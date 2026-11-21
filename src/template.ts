@@ -29,6 +29,13 @@ export const DEFAULT_TEMPLATES_RAW = [
   '自由 |  | {note}',
 ].join('\n');
 
+export const DEFAULT_TEMPLATES_RAW_EN = [
+  '# Name | Keywords (comma-separated) | Template | Position (end = after the ✅ date; optional)',
+  'Run | Jog, Long Jog, Running | {km} km / {minutes} min',
+  'Reading | Reading | {minutes} min {title}',
+  'Free |  | {note}',
+].join('\n');
+
 export function parseTemplateDefs(raw: string): TemplateDef[] {
   const defs: TemplateDef[] = [];
   for (const line of raw.split('\n')) {

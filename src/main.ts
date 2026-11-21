@@ -18,12 +18,12 @@ import {
 } from './lineEdit';
 import {
   TemplateDef,
-  DEFAULT_TEMPLATES_RAW,
   parseTemplateDefs,
   placeholdersOf,
   composeNote,
   selectTemplate,
 } from './template';
+import { strings, defaultTemplatesRaw } from './i18n';
 
 interface TasksApiV1 {
   executeToggleTaskDoneCommand: (line: string, path: string) => string;
@@ -37,7 +37,9 @@ interface CompleteWithNoteSettings {
 }
 
 const DEFAULT_SETTINGS: CompleteWithNoteSettings = {
-  templatesRaw: DEFAULT_TEMPLATES_RAW,
+  // Placeholder: loadSettings replaces this with the app's language
+  // version (defaultTemplatesRaw) when no settings are saved yet.
+  templatesRaw: '',
   hookTasksLists: true,
   hookScope: 'templated',
   debugNotices: false,
@@ -69,7 +71,7 @@ class NoteModal extends Modal {
     this.defs = inline
       ? [
           {
-            name: 'タスク内テンプレート',
+            name: strings().inlineTemplateName,
             keywords: [],
             template: inline.template,
             position: 'end' as const,
@@ -82,7 +84,8 @@ class NoteModal extends Modal {
 
   onOpen() {
     const { contentEl } = this;
-    contentEl.createEl('h3', { text: '追記して完了' });
+    const s = strings();
+    contentEl.createEl('h3', { text: s.modalTitle });
     contentEl.createEl('p', {
       text: taskDescriptionHead(this.taskLine),
       cls: 'complete-with-note-task',
@@ -115,7 +118,7 @@ class NoteModal extends Modal {
     this.renderFields();
 
     const hintEl = contentEl.createEl('p', {
-      text: '追記は完了した行にだけ入ります（繰り返しの次回分には入りません）。空欄のまま完了もできます。',
+      text: s.modalHint,
     });
     hintEl.style.fontSize = '0.85em';
     hintEl.style.opacity = '0.7';
@@ -126,11 +129,11 @@ class NoteModal extends Modal {
     btnRow.style.gap = '0.6em';
     btnRow.style.marginTop = '1em';
     const okBtn = btnRow.createEl('button', {
-      text: '追記して完了',
+      text: s.okButton,
       cls: 'mod-cta',
     });
     okBtn.addEventListener('click', () => this.submit());
-    const cancelBtn = btnRow.createEl('button', { text: 'キャンセル' });
+    const cancelBtn = btnRow.createEl('button', { text: s.cancelButton });
     cancelBtn.addEventListener('click', () => this.close());
   }
 
@@ -189,7 +192,7 @@ class NoteModal extends Modal {
       // 'end': the note lands after the ✅ date, at the line's end.
       preview = note ? `${head} … ${note}` : head;
     }
-    this.previewEl.setText('プレビュー: ' + preview);
+    this.previewEl.setText(strings().previewPrefix + preview);
   }
 
   private submit() {
@@ -214,13 +217,14 @@ class CompleteWithNoteSettingTab extends PluginSettingTab {
 
   display() {
     const { containerEl } = this;
+    const s = strings();
     containerEl.empty();
     containerEl.createEl('h3', { text: 'Complete with Note' });
     containerEl.createEl('p', {
-      text: '入力テンプレートを1行に1つ、「名前 | キーワード | テンプレート」の形式で書きます。タスク名にキーワードが含まれるテンプレートが自動で選ばれます。キーワードなしの行が既定（フォールバック）です。タスク行自体に {km} のようなテンプレートが書かれている場合は、そちらが優先されます。',
+      text: s.settingsIntro,
     });
     new Setting(containerEl)
-      .setName('テンプレート')
+      .setName(s.templatesName)
       .addTextArea((ta) => {
         ta.setValue(this.plugin.settings.templatesRaw)
           .onChange(async (value) => {
@@ -231,10 +235,8 @@ class CompleteWithNoteSettingTab extends PluginSettingTab {
         ta.inputEl.style.width = '100%';
       });
     new Setting(containerEl)
-      .setName('Tasksの一覧でチェックボックスをフック')
-      .setDesc(
-        'Tasksプラグインのクエリ結果や閲覧ビューでチェックボックスをクリックしたとき、通常の完了の代わりに記録モーダルを開きます（完了方向のみ。チェックを外す操作は通常どおり）。元のタスクを特定できない場合は通常のクリックとして処理されます。',
-      )
+      .setName(s.hookName)
+      .setDesc(s.hookDesc)
       .addToggle((tg) => {
         tg.setValue(this.plugin.settings.hookTasksLists).onChange(
           async (value) => {
@@ -244,13 +246,11 @@ class CompleteWithNoteSettingTab extends PluginSettingTab {
         );
       });
     new Setting(containerEl)
-      .setName('フックする対象')
-      .setDesc(
-        '「テンプレートのあるタスクのみ」では、タスク内テンプレートかキーワード一致する設定テンプレートがあるタスクだけモーダルを開き、それ以外は記録なしで通常完了します。',
-      )
+      .setName(s.scopeName)
+      .setDesc(s.scopeDesc)
       .addDropdown((dd) => {
-        dd.addOption('templated', 'テンプレートのあるタスクのみ')
-          .addOption('all', 'すべてのタスク')
+        dd.addOption('templated', s.scopeTemplated)
+          .addOption('all', s.scopeAll)
           .setValue(this.plugin.settings.hookScope)
           .onChange(async (value) => {
             this.plugin.settings.hookScope = value as 'templated' | 'all';
@@ -258,10 +258,8 @@ class CompleteWithNoteSettingTab extends PluginSettingTab {
           });
       });
     new Setting(containerEl)
-      .setName('デバッグ通知')
-      .setDesc(
-        'フックの判定過程を通知で表示します（トラブル調査用。通常はオフ）。',
-      )
+      .setName(s.debugName)
+      .setDesc(s.debugDesc)
       .addToggle((tg) => {
         tg.setValue(this.plugin.settings.debugNotices).onChange(
           async (value) => {
@@ -282,12 +280,12 @@ export default class CompleteWithNotePlugin extends Plugin {
 
     this.addCommand({
       id: 'complete-with-note',
-      name: '追記して完了',
+      name: strings().commandName,
       editorCallback: (editor: Editor, view: MarkdownView) => {
         const lineNo = editor.getCursor().line;
         const line = editor.getLine(lineNo);
         if (!/^\s*- \[ \]/.test(line)) {
-          new Notice('未完了のタスク行にカーソルを置いてください');
+          new Notice(strings().noticePlaceCursor);
           return;
         }
         const path = view.file?.path ?? '';
@@ -314,11 +312,12 @@ export default class CompleteWithNotePlugin extends Plugin {
   }
 
   async loadSettings() {
-    this.settings = Object.assign(
-      {},
-      DEFAULT_SETTINGS,
-      await this.loadData(),
-    );
+    const saved = await this.loadData();
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, saved);
+    if (!saved) {
+      // First run: seed the sample templates in the app's language.
+      this.settings.templatesRaw = defaultTemplatesRaw();
+    }
   }
 
   async saveSettings() {
@@ -328,7 +327,14 @@ export default class CompleteWithNotePlugin extends Plugin {
   private templates(): TemplateDef[] {
     const defs = parseTemplateDefs(this.settings.templatesRaw);
     if (defs.length > 0) return defs;
-    return [{ name: '自由', keywords: [], template: '{note}', position: 'end' }];
+    return [
+      {
+        name: strings().fallbackTemplateName,
+        keywords: [],
+        template: '{note}',
+        position: 'end',
+      },
+    ];
   }
 
   private openModal(
@@ -365,21 +371,22 @@ export default class CompleteWithNotePlugin extends Plugin {
     lineNumber: number,
     expectedText?: string,
   ): Promise<void> {
+    const s = strings();
     const file = this.app.vault.getAbstractFileByPath(path);
     if (!(file instanceof TFile)) {
-      new Notice('ファイルが見つかりません: ' + path);
+      new Notice(s.noticeFileNotFoundPrefix + path);
       return;
     }
     const content = await this.app.vault.read(file);
     const line = content.split('\n')[lineNumber];
     if (line === undefined || !/^\s*- \[ \]/.test(line)) {
-      new Notice('対象のタスク行が見つかりません（完了済みか、行がずれています）');
+      new Notice(s.noticeTaskLineNotFound);
       return;
     }
     if (expectedText) {
       const probe = expectedText.trim().slice(0, 20);
       if (probe && !line.includes(probe)) {
-        new Notice('タスクの内容が変わっているため中止しました');
+        new Notice(s.noticeTaskChanged);
         return;
       }
     }
@@ -393,7 +400,7 @@ export default class CompleteWithNotePlugin extends Plugin {
         position,
       );
       if (!applied) {
-        new Notice('ファイルが変更されていたため中止しました');
+        new Notice(s.noticeFileChanged);
       }
     });
   }
@@ -443,16 +450,17 @@ export default class CompleteWithNotePlugin extends Plugin {
         new Notice('[CWN] ' + dbg.join(' / '), 10000);
       }
     };
+    const s = strings();
     if (!inQuery && !inReading) {
-      debug('対象リスト外');
+      debug(s.dbgOutsideList);
       return;
     }
-    debug(inQuery ? 'クエリ結果' : '閲覧ビュー');
+    debug(inQuery ? s.dbgQueryResult : s.dbgReadingView);
     // Only completing a TODO task is hooked; un-completing and other
     // statuses pass through to the Tasks plugin.
     const statusType = li.getAttribute('data-task-status-type');
     if (statusType && statusType !== 'TODO') {
-      debug('status=' + statusType + ' のため素通し');
+      debug(s.dbgPassThroughStatus(statusType));
       return;
     }
 
@@ -465,7 +473,7 @@ export default class CompleteWithNotePlugin extends Plugin {
     if (inQuery) {
       const anchor = li.querySelector('.tasks-backlink a.internal-link');
       const rawText = anchor?.textContent?.trim() ?? '';
-      debug('backlink=' + (rawText || 'なし'));
+      debug('backlink=' + (rawText || s.dbgBacklinkNone));
       if (rawText) {
         // Link text may carry a heading suffix: "file > Heading".
         const linkpath = rawText.split(' > ')[0].trim();
@@ -485,7 +493,7 @@ export default class CompleteWithNotePlugin extends Plugin {
       file = this.app.workspace.getActiveFile() ?? null;
     }
     if (!file) {
-      debug('ファイルを特定できず素通し');
+      debug(s.dbgFileUnresolved);
       return; // cannot resolve -> let Tasks handle it
     }
     debug('file=' + file.path);
@@ -512,7 +520,7 @@ export default class CompleteWithNotePlugin extends Plugin {
 
     evt.preventDefault();
     evt.stopPropagation();
-    debug('横取りして処理開始');
+    debug(s.dbgHookStart);
     void this.completeFromRenderedTask(
       file,
       Number.isNaN(hint) ? -1 : hint,
@@ -528,15 +536,16 @@ export default class CompleteWithNotePlugin extends Plugin {
     renderedDesc: string,
     fieldTexts: string[] = [],
   ): Promise<void> {
+    const s = strings();
     const content = await this.app.vault.read(file);
     const lines = content.split('\n');
     const idx = findTaskLine(lines, hintLine, renderedDesc, fieldTexts);
     if (idx === -1) {
-      new Notice('対象のタスク行を特定できませんでした');
+      new Notice(s.noticeLineNotIdentified);
       return;
     }
     if (this.settings.debugNotices) {
-      new Notice('[CWN] 行を特定: ' + (idx + 1) + '行目', 8000);
+      new Notice('[CWN] ' + s.dbgLineIdentified(idx + 1), 8000);
     }
     const line = lines[idx];
 
@@ -544,12 +553,12 @@ export default class CompleteWithNotePlugin extends Plugin {
       // No record format defined for this task: complete it plainly,
       // exactly as the Tasks plugin would have.
       const applied = await this.applyCompletion(file, idx, line, '', 'end');
-      if (!applied) new Notice('ファイルが変更されていたため中止しました');
+      if (!applied) new Notice(s.noticeFileChanged);
       return;
     }
     this.openModal(line, async (note, position) => {
       const applied = await this.applyCompletion(file, idx, line, note, position);
-      if (!applied) new Notice('ファイルが変更されていたため中止しました');
+      if (!applied) new Notice(s.noticeFileChanged);
     });
   }
 
@@ -578,7 +587,7 @@ export default class CompleteWithNotePlugin extends Plugin {
       return api.executeToggleTaskDoneCommand(line, path);
     }
     const today = (window as any).moment().format('YYYY-MM-DD');
-    new Notice('TasksプラグインのAPIが見つからないため、簡易完了にしました（繰り返しは処理されません）');
+    new Notice(strings().noticeTasksApiMissing);
     return line.replace(/^(\s*- )\[ \]/, '$1[x]') + ` ✅ ${today}`;
   }
 }
