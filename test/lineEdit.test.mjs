@@ -9,6 +9,7 @@ import {
   replaceInlineTemplate,
   normalizeHeadForMatch,
   findTaskLine,
+  UNCHECKED_TASK_LINE_RE,
 } from './lineEdit.mjs';
 
 let failures = 0;
@@ -321,6 +322,70 @@ check(
   'findTaskLine field mismatch',
   findTaskLine(dupLines, 0, 'Jog {km} km / {minites} min', ['🛫 2026-12-31']),
   -1,
+);
+// 32. Tasks inside a callout/blockquote carry a `>` prefix. Dataview
+//     still indexes them, so the unchecked-line test must accept them.
+check(
+  'quoted task line is an unchecked task line',
+  UNCHECKED_TASK_LINE_RE.test(
+    '> - [ ] マネーフォワードにレシートを登録 🔁 every week 📅 2026-11-26',
+  ),
+  true,
+);
+check(
+  'nested quoted task line is an unchecked task line',
+  UNCHECKED_TASK_LINE_RE.test('> > - [ ] nested task'),
+  true,
+);
+check(
+  'quoted completed line is not an unchecked task line',
+  UNCHECKED_TASK_LINE_RE.test('> - [x] done task ✅ 2026-11-26'),
+  false,
+);
+// 33. taskDescriptionHead strips the quote prefix and the checkbox.
+check(
+  'head of a quoted task line',
+  taskDescriptionHead(
+    '> - [ ] マネーフォワードにレシートを登録 🔁 every week 📅 2026-11-26',
+  ),
+  'マネーフォワードにレシートを登録',
+);
+// 34. findTaskLine locates a quoted task line in the source file.
+const calloutLines = [
+  '> [!todo] レシート管理',
+  '>',
+  '> - [ ] マネーフォワードにレシートを登録 🔁 every week 📅 2026-11-26',
+  '> - [x] マネーフォワードにレシートを登録 🔁 every week 📅 2026-11-19 ✅ 2026-11-19',
+];
+check(
+  'findTaskLine finds a quoted task line',
+  findTaskLine(calloutLines, 0, 'マネーフォワードにレシートを登録', [
+    '🔁 every week',
+    '📅 2026-11-26',
+  ]),
+  2,
+);
+// 35. The note lands on the quoted completed line only; the next
+//     occurrence of the recurring task stays clean.
+check(
+  'note applied to a quoted toggled result',
+  applyNoteToToggledResult(
+    '> - [x] マネーフォワードにレシートを登録 🔁 every week 📅 2026-11-26 ✅ 2026-11-26\n' +
+      '> - [ ] マネーフォワードにレシートを登録 🔁 every week 📅 2026-12-03',
+    '登録した',
+    'end',
+  ),
+  '> - [x] マネーフォワードにレシートを登録 🔁 every week 📅 2026-11-26 ✅ 2026-11-26 登録した\n' +
+    '> - [ ] マネーフォワードにレシートを登録 🔁 every week 📅 2026-12-03',
+);
+// 36. appendNoteToTaskLine keeps the quote prefix intact.
+check(
+  'appendNoteToTaskLine on a quoted line',
+  appendNoteToTaskLine(
+    '> - [ ] マネーフォワードにレシートを登録 🔁 every week 📅 2026-11-26',
+    '登録した',
+  ),
+  '> - [ ] マネーフォワードにレシートを登録 登録した 🔁 every week 📅 2026-11-26',
 );
 
 console.log(failures === 0 ? '\nALL PASSED' : `\n${failures} FAILED`);

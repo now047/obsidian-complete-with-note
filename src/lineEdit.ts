@@ -11,6 +11,17 @@ const FIELD_MARKERS = [
   '⏫', '🔼', '🔽', '⏬', '🆔', '⛔', '🏁', '⏰',
 ];
 
+/**
+ * Task lines may live inside a blockquote or callout, where the line
+ * carries one or more `>` markers before the list marker:
+ *   > - [ ] task inside a [!todo] callout
+ * Dataview and the Tasks plugin both index such tasks, so every
+ * task-line test in this plugin tolerates the quote prefix.
+ */
+export const UNCHECKED_TASK_LINE_RE = /^\s*(?:>\s*)*- \[ \]/;
+export const COMPLETED_TASK_LINE_RE = /^\s*(?:>\s*)*- \[x\]/i;
+const ANY_TASK_LINE_RE = /^\s*(?:>\s*)*- \[[ xX/-]\]\s*/;
+
 export function appendNoteToTaskLine(line: string, note: string): string {
   const text = note.trim();
   if (!text) return line;
@@ -38,7 +49,7 @@ export function appendNoteToTaskLine(line: string, note: string): string {
  * modal title and for fuzzy verification of a line coming from Dataview.
  */
 export function taskDescriptionHead(line: string): string {
-  const withoutBox = line.replace(/^\s*- \[[ xX/-]\]\s*/, '');
+  const withoutBox = line.replace(ANY_TASK_LINE_RE, '');
   let cut = withoutBox.length;
   for (const marker of FIELD_MARKERS) {
     const idx = withoutBox.indexOf(marker);
@@ -166,7 +177,7 @@ export function findTaskLine(
   const matches: number[] = [];
   for (let idx = 0; idx < lines.length; idx++) {
     const line = lines[idx];
-    if (!/^\s*- \[ \]/.test(line)) continue;
+    if (!UNCHECKED_TASK_LINE_RE.test(line)) continue;
     if (wanted) {
       const head = normalizeHeadForMatch(taskDescriptionHead(line));
       if (!(head.startsWith(wanted) || wanted.startsWith(head.slice(0, 16)))) {
@@ -205,7 +216,7 @@ export function applyNoteToToggledResult(
 ): string {
   const text = note.trim();
   const lines = toggled.split('\n');
-  const idx = lines.findIndex((l) => /^\s*- \[x\]/i.test(l));
+  const idx = lines.findIndex((l) => COMPLETED_TASK_LINE_RE.test(l));
   if (idx === -1) return toggled;
   if (extractInlineTemplate(lines[idx])) {
     // Inline template: the record replaces the definition in place,

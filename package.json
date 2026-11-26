@@ -11,5 +11,5 @@
     "build": "node esbuild.config.mjs",
     "test": "node esbuild.config.mjs test && node test/lineEdit.test.mjs && node test/template.test.mjs"
   },
-  "version": "0.7.0"
+  "version": "0.7.1"
 }

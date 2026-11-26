@@ -10,6 +10,7 @@ import {
   TFile,
 } from 'obsidian';
 import {
+  UNCHECKED_TASK_LINE_RE,
   applyNoteToToggledResult,
   extractInlineTemplate,
   findTaskLine,
@@ -284,7 +285,7 @@ export default class CompleteWithNotePlugin extends Plugin {
       editorCallback: (editor: Editor, view: MarkdownView) => {
         const lineNo = editor.getCursor().line;
         const line = editor.getLine(lineNo);
-        if (!/^\s*- \[ \]/.test(line)) {
+        if (!UNCHECKED_TASK_LINE_RE.test(line)) {
           new Notice(strings().noticePlaceCursor);
           return;
         }
@@ -379,7 +380,7 @@ export default class CompleteWithNotePlugin extends Plugin {
     }
     const content = await this.app.vault.read(file);
     const line = content.split('\n')[lineNumber];
-    if (line === undefined || !/^\s*- \[ \]/.test(line)) {
+    if (line === undefined || !UNCHECKED_TASK_LINE_RE.test(line)) {
       new Notice(s.noticeTaskLineNotFound);
       return;
     }
@@ -588,6 +589,8 @@ export default class CompleteWithNotePlugin extends Plugin {
     }
     const today = (window as any).moment().format('YYYY-MM-DD');
     new Notice(strings().noticeTasksApiMissing);
-    return line.replace(/^(\s*- )\[ \]/, '$1[x]') + ` ✅ ${today}`;
+    return (
+      line.replace(/^(\s*(?:>\s*)*- )\[ \]/, '$1[x]') + ` ✅ ${today}`
+    );
   }
 }
